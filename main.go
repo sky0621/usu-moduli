@@ -83,6 +83,9 @@ func apply(path string, info os.FileInfo, err error) error {
 		if strings.HasPrefix(ttxt, "version:") {
 			vtxt := strings.Replace(ttxt, "version:", "", -1)
 			tvtxt := strings.Trim(vtxt, " ")
+			if strings.Contains(tvtxt, "^") {
+				tvtxt = strings.Replace(tvtxt, "^", "\\^", -1)
+			}
 			nowPkg.Version = tvtxt
 		}
 	}
