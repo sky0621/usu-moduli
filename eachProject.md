@@ -2,10 +2,10 @@
 
 #### ※ツール（ https://github.com/sky0621/usu-moduli ）による自動生成
 
-{{range .Deps}}## {{.Prj}}
+{{range .Projects}}## {{.Name}}
 
 | Name | Version |
 | :--- | :--- |
-{{range .Pkgs}}| {{.Name}} | {{.Version}} |
+{{range .Packages}}| {{.Name}} | {{.Version}} |
 {{end}}
 {{end}}

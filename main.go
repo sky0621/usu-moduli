@@ -12,14 +12,15 @@ import (
 	"time"
 )
 
-var deps = []*Dep{}
+var projects = []*Project{}
 
 // TODO 機能実現スピード最優先での実装なので要リファクタ
 func main() {
 	targetDir := flag.String("d", ".", "Target Directory")
 	flag.Parse()
 
-	eachProject(*targetDir)
+	// eachProject(*targetDir)
+	eachPackage(*targetDir)
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -34,7 +35,7 @@ func eachProject(targetDir string) {
 
 	tmpl := template.Must(template.ParseFiles("./eachProject.md"))
 	buf := &bytes.Buffer{}
-	err = tmpl.Execute(buf, &Result{Datetime: time.Now().Format("2006-01-02 15:04"), Deps: deps})
+	err = tmpl.Execute(buf, &Result{Datetime: time.Now().Format("2006-01-02 15:04"), Projects: projects})
 	if err != nil {
 		panic(err)
 	}
@@ -68,21 +69,21 @@ func applyEachProject(path string, info os.FileInfo, err error) error {
 		}
 	}()
 
-	dep := &Dep{Prj: prjName}
+	project := &Project{Name: prjName}
 
-	pkgs := []Pkg{}
+	Packages := []Package{}
 
-	nowPkg := Pkg{}
+	nowPackage := Package{}
 
 	scanner := bufio.NewScanner(fp)
 	for scanner.Scan() {
 		txt := scanner.Text()
 		if strings.HasPrefix(txt, "- package:") {
-			if nowPkg.Name != "" {
-				pkgs = append(pkgs, nowPkg)
+			if nowPackage.Name != "" {
+				Packages = append(Packages, nowPackage)
 			}
 			rtxt := strings.Replace(txt, "- package: ", "", -1)
-			nowPkg = Pkg{Name: strings.Trim(rtxt, " ")}
+			nowPackage = Package{Name: strings.Trim(rtxt, " ")}
 		}
 		ttxt := strings.Trim(txt, " ")
 		if strings.HasPrefix(ttxt, "version:") {
@@ -91,27 +92,27 @@ func applyEachProject(path string, info os.FileInfo, err error) error {
 			if strings.Contains(tvtxt, "^") {
 				tvtxt = strings.Replace(tvtxt, "^", "\\^", -1)
 			}
-			nowPkg.Version = tvtxt
+			nowPackage.Version = tvtxt
 		}
 	}
-	dep.Pkgs = pkgs
+	project.Packages = Packages
 
-	deps = append(deps, dep)
+	projects = append(projects, project)
 
 	return nil
 }
 
 type Result struct {
 	Datetime string
-	Deps     []*Dep
+	Projects []*Project
 }
 
-type Dep struct {
-	Prj  string
-	Pkgs []Pkg
+type Project struct {
+	Name     string
+	Packages []Package
 }
 
-type Pkg struct {
+type Package struct {
 	Name    string
 	Version string
 }
@@ -120,15 +121,59 @@ type Pkg struct {
 // パッケージ別の各プロジェクトでの使用バージョン一覧
 // ------------------------------------------------------------------------------------------------
 func eachPackage(targetDir string) {
-	err := filepath.Walk(targetDir, applyEachPackage)
+	err := filepath.Walk(targetDir, applyEachProject)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(-1)
 	}
 
+	for _, project := range projects {
+		prjName := project.Name
+		project2s = append(project2s, &Project2{Name: prjName})
+	}
+
+	pkgMap := make(map[string]map[string]string)
+
+	for _, project := range projects {
+		prjName := project.Name
+		for _, pkg := range project.Packages {
+			pkgName := pkg.Name
+			pkgVer := pkg.Version
+
+			// まだパッケージ未保存
+			if _, ok := pkgMap[pkgName]; !ok {
+				pkgMap[pkgName] = make(map[string]string)
+			}
+
+			prjMap := pkgMap[pkgName]
+			// まだプロジェクト（とバージョン）未保存
+			if _, ok := prjMap[prjName]; !ok {
+				prjMap[prjName] = pkgVer
+			}
+		}
+	}
+
+	var eachProject2s = []*Project2{}
+	for pkgName, prjMap := range pkgMap {
+		pkg2 := &Package2{Name: pkgName}
+		for prjName, ver := range prjMap {
+			for _, project2 := range project2s {
+				eachProject2 := &Project2{Name: project2.Name}
+				if project2.Name == prjName && ver != "" {
+					eachProject2.Version = ver
+				} else {
+					eachProject2.Version = "　"
+				}
+				eachProject2s = append(eachProject2s, eachProject2)
+			}
+		}
+		pkg2.Project2s = eachProject2s
+		packages2 = append(packages2, pkg2)
+	}
+
 	tmpl := template.Must(template.ParseFiles("./eachPackage.md"))
 	buf := &bytes.Buffer{}
-	err = tmpl.Execute(buf, &Result{Datetime: time.Now().Format("2006-01-02 15:04"), Deps: deps})
+	err = tmpl.Execute(buf, &Result2{Datetime: time.Now().Format("2006-01-02 15:04"), Project2s: project2s, Packages2: packages2})
 	if err != nil {
 		panic(err)
 	}
@@ -136,61 +181,22 @@ func eachPackage(targetDir string) {
 	fmt.Println(buf.String())
 }
 
-func applyEachPackage(path string, info os.FileInfo, err error) error {
-	if err != nil {
-		return err
-	}
+var project2s = []*Project2{}
 
-	if info.IsDir() {
-		return nil
-	}
+var packages2 = []*Package2{}
 
-	if !strings.Contains(path, "glide.yaml") {
-		return nil
-	}
+type Result2 struct {
+	Datetime  string
+	Project2s []*Project2
+	Packages2 []*Package2
+}
 
-	seps := strings.Split(path, "/")
-	prjName := seps[len(seps)-2]
+type Package2 struct {
+	Name      string
+	Project2s []*Project2
+}
 
-	fp, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if fp != nil {
-			fp.Close()
-		}
-	}()
-
-	dep := &Dep{Prj: prjName}
-
-	pkgs := []Pkg{}
-
-	nowPkg := Pkg{}
-
-	scanner := bufio.NewScanner(fp)
-	for scanner.Scan() {
-		txt := scanner.Text()
-		if strings.HasPrefix(txt, "- package:") {
-			if nowPkg.Name != "" {
-				pkgs = append(pkgs, nowPkg)
-			}
-			rtxt := strings.Replace(txt, "- package: ", "", -1)
-			nowPkg = Pkg{Name: strings.Trim(rtxt, " ")}
-		}
-		ttxt := strings.Trim(txt, " ")
-		if strings.HasPrefix(ttxt, "version:") {
-			vtxt := strings.Replace(ttxt, "version:", "", -1)
-			tvtxt := strings.Trim(vtxt, " ")
-			if strings.Contains(tvtxt, "^") {
-				tvtxt = strings.Replace(tvtxt, "^", "\\^", -1)
-			}
-			nowPkg.Version = tvtxt
-		}
-	}
-	dep.Pkgs = pkgs
-
-	deps = append(deps, dep)
-
-	return nil
+type Project2 struct {
+	Name    string
+	Version string
 }
