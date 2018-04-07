@@ -92,6 +92,9 @@ func applyEachProject(path string, info os.FileInfo, err error) error {
 			if strings.Contains(tvtxt, "^") {
 				tvtxt = strings.Replace(tvtxt, "^", "\\^", -1)
 			}
+			// if strings.Contains(tvtxt, "~") {
+			// 	tvtxt = strings.Replace(tvtxt, "~", "\\~", -1)
+			// }
 			nowPackage.Version = tvtxt
 		}
 	}
@@ -127,15 +130,17 @@ func eachPackage(targetDir string) {
 		os.Exit(-1)
 	}
 
+	// ヘッダ用とパッケージごとのプロジェクト別バージョンを揃えるため
 	for _, project := range projects {
-		prjName := project.Name
-		project2s = append(project2s, &Project2{Name: prjName})
+		projectNames = append(projectNames, project.Name)
 	}
 
+	// map[packageName]map[projectName]version
 	pkgMap := make(map[string]map[string]string)
 
 	for _, project := range projects {
 		prjName := project.Name
+
 		for _, pkg := range project.Packages {
 			pkgName := pkg.Name
 			pkgVer := pkg.Version
@@ -153,27 +158,24 @@ func eachPackage(targetDir string) {
 		}
 	}
 
-	var eachProject2s = []*Project2{}
 	for pkgName, prjMap := range pkgMap {
 		pkg2 := &Package2{Name: pkgName}
-		for prjName, ver := range prjMap {
-			for _, project2 := range project2s {
-				eachProject2 := &Project2{Name: project2.Name}
-				if project2.Name == prjName && ver != "" {
-					eachProject2.Version = ver
-				} else {
-					eachProject2.Version = "　"
-				}
-				eachProject2s = append(eachProject2s, eachProject2)
+
+		for _, projectName := range projectNames {
+			pkgVer, ok := prjMap[projectName]
+			if ok {
+				pkg2.Project2s = append(pkg2.Project2s, &Project2{Name: projectName, Version: pkgVer})
+			} else {
+				pkg2.Project2s = append(pkg2.Project2s, &Project2{Name: projectName, Version: "-"})
 			}
 		}
-		pkg2.Project2s = eachProject2s
+
 		packages2 = append(packages2, pkg2)
 	}
 
 	tmpl := template.Must(template.ParseFiles("./eachPackage.md"))
 	buf := &bytes.Buffer{}
-	err = tmpl.Execute(buf, &Result2{Datetime: time.Now().Format("2006-01-02 15:04"), Project2s: project2s, Packages2: packages2})
+	err = tmpl.Execute(buf, &Result2{Datetime: time.Now().Format("2006-01-02 15:04"), ProjectNames: projectNames, Packages2: packages2})
 	if err != nil {
 		panic(err)
 	}
@@ -181,14 +183,14 @@ func eachPackage(targetDir string) {
 	fmt.Println(buf.String())
 }
 
-var project2s = []*Project2{}
+var projectNames = []string{}
 
 var packages2 = []*Package2{}
 
 type Result2 struct {
-	Datetime  string
-	Project2s []*Project2
-	Packages2 []*Package2
+	Datetime     string
+	ProjectNames []string
+	Packages2    []*Package2
 }
 
 type Package2 struct {
