@@ -16,8 +16,14 @@ var projects = []*Project{}
 
 // TODO 機能実現スピード最優先での実装なので要リファクタ
 func main() {
-	targetDir := flag.String("d", ".", "Target Directory")
+	targetDir := flag.String("d", "", "Target Directory")
 	flag.Parse()
+
+	if *targetDir == "" {
+		fmt.Println("need `-d` flag")
+		fmt.Println("[example] usu-moduli -d {target fullpath directory} > {output markdown filename}")
+		return
+	}
 
 	// eachProject(*targetDir)
 	eachPackage(*targetDir)
@@ -33,7 +39,7 @@ func eachProject(targetDir string) {
 		os.Exit(-1)
 	}
 
-	tmpl := template.Must(template.ParseFiles("./eachProject.md"))
+	tmpl := template.Must(template.ParseFiles("./template/eachProject.md"))
 	buf := &bytes.Buffer{}
 	err = tmpl.Execute(buf, &Result{Datetime: time.Now().Format("2006-01-02 15:04"), Projects: projects})
 	if err != nil {
@@ -173,7 +179,10 @@ func eachPackage(targetDir string) {
 		packages2 = append(packages2, pkg2)
 	}
 
-	tmpl := template.Must(template.ParseFiles("./eachPackage.md"))
+	afile := Assets.Files["/template/eachPackage.md"]
+
+	tmpl := template.Must(template.New("md").Parse(string(afile.Data)))
+
 	buf := &bytes.Buffer{}
 	err = tmpl.Execute(buf, &Result2{Datetime: time.Now().Format("2006-01-02 15:04"), ProjectNames: projectNames, Packages2: packages2})
 	if err != nil {

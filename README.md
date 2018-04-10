@@ -9,6 +9,16 @@ go version 1.9.4
 
 https://github.com/golang/dep
 
+## go run example
+
+go run main.go template.go -d {target fullpath directory} > {output markdown filename}
+
+## go-assets-builder
+
+go get -v github.com/jessevdk/go-assets-builder
+
+go-assets-builder template/ > template.go
+
 ## gox
 
 https://github.com/mitchellh/gox
