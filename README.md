@@ -1,5 +1,5 @@
 # usu-moduli
-List the modules used by the project
+List the modules used by the project (based on "glide.yaml")
 
 ## env
 
